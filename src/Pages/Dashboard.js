@@ -37,14 +37,19 @@ export default function Dashboard() {
     fetchExpenses()
   }, [])
 
-  const fetchExpenses = async () => {
-    try {
-      const res = await axios.get("/api/expenses")
-      setExpenses(res.data)
-    } catch (err) {
-      console.error(err)
-    }
+ const fetchExpenses = async () => {
+  try {
+    const res = await axios.get("/api/expenses")
+
+    const data = res.data.expenses || res.data
+
+    setExpenses(Array.isArray(data) ? data : [])
+
+  } catch (err) {
+    console.error(err)
+    setExpenses([])
   }
+}
 
   /* ================= TODAY EXPENSE ================= */
 
@@ -223,7 +228,7 @@ export default function Dashboard() {
 
           {/* CATEGORY PIE CHART */}
 
-          <div className="bg-[#12101a] p-6 rounded-xl h-[260px]">
+         <div className="bg-[#12101a] p-6 rounded-xl min-h-[260px]">
 
             <h2 className="text-lg mb-4 text-purple-200">
               Expense Categories
@@ -256,7 +261,7 @@ export default function Dashboard() {
 
           {/* DAILY EXPENSE GRAPH */}
 
-          <div className="bg-[#12101a] p-6 rounded-xl h-[260px]">
+         <div className="bg-[#12101a] p-6 rounded-xl min-h-[260px]">
 
             <h2 className="text-lg mb-4 text-purple-200">
               Daily Spending Trend
@@ -289,7 +294,7 @@ export default function Dashboard() {
 
           {/* MONTHLY BAR GRAPH */}
 
-          <div className="bg-[#12101a] p-6 rounded-xl h-[260px]">
+         <div className="bg-[#12101a] p-6 rounded-xl min-h-[260px]">
 
             <h2 className="text-lg mb-4 text-purple-200">
               Monthly Expenses
