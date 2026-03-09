@@ -13,59 +13,65 @@ function Login() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   /* ---------------- AUTH FUNCTION ---------------- */
- /* ---------------- AUTH FUNCTION ---------------- */
-  const handleAuth = async () => {
-    if (isSignup) {
-      // SIGNUP LOGIC
-      if (password !== confirmPassword) {
-        alert("Passwords do not match");
-        return;
-      }
-      try {
-        console.log(`API URL: ${process.env.REACT_APP_API_URL}`);
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/signup`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: fullName, email: email, password: password })
-        });
+const handleAuth = async () => {
+  const API_URL = process.env.REACT_APP_API_URL; // Consistent with Dashboard
 
-        if (response.ok) {
-          alert("Account created successfully!");
-          setIsSignup(false);
-        } else {
-          alert("Signup failed");
-        }
-        setFullName(""); setEmail(""); setPassword(""); setConfirmPassword("");
-      } catch (error) {
-        console.error(error);
-        alert("Signup failed");
-      }
-    } else {
-      // LOGIN LOGIC
-      try {
-        console.log(`Attempting Login at: ${process.env.REACT_APP_API_URL}`);
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/users/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email, password: password })
-        });
-
-        if (!response.ok) throw new Error("Login failed");
-
-        // Use .text() or .json() depending on your Java backend
-        const token = await response.text();
-        const extractedName = email.split('@')[0];
-
-        localStorage.setItem("token", token);
-        localStorage.setItem("username", extractedName); 
-
-        navigate("/dashboard");
-      } catch (error) {
-        console.error(error);
-        alert("Invalid credentials");
-      }
+  if (isSignup) {
+    if (password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
     }
-  };
+    try {
+      const response = await fetch(`${API_URL}/api/users/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: fullName, email: email, password: password })
+      });
+
+      if (response.ok) {
+        alert("Account created successfully!");
+        setIsSignup(false);
+      } else {
+        alert("Signup failed: User may already exist");
+      }
+    } catch (error) {
+      console.error("Signup Error:", error);
+      alert("Cannot connect to server");
+    }
+  } else {
+    // LOGIN LOGIC
+    try {
+      const response = await fetch(`${API_URL}/api/users/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, password: password })
+      });
+
+      if (!response.ok) throw new Error("Invalid Credentials");
+
+      // Check if response is JSON or Text
+      const contentType = response.headers.get("content-type");
+      let token;
+      
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const data = await response.json();
+        token = data.token; // Assuming your Java backend returns { "token": "..." }
+      } else {
+        token = await response.text();
+      }
+
+      const extractedName = email.split('@')[0];
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("username", extractedName); 
+
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Login Error:", error);
+      alert("Invalid email or password");
+    }
+  }
+};
 
   /* ---------------- 3D CARD EFFECT ---------------- */
   const handleMouseMove = (e) => {
