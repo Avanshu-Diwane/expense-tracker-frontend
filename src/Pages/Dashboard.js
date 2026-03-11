@@ -1,320 +1,373 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+
 import {
-PieChart, Pie, Cell, Tooltip,
-ResponsiveContainer,
-BarChart, Bar,
-LineChart, Line,
-XAxis, YAxis, CartesianGrid
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid
 } from "recharts";
 
-const COLORS = ["#c084fc","#9333ea","#7e22ce","#6d28d9","#a855f7"];
+const COLORS = ["#a855f7", "#9333ea", "#c084fc", "#7e22ce", "#6d28d9"];
 
-function Dashboard(){
+function Dashboard() {
 
-const API = process.env.REACT_APP_API_URL;
+  const API = process.env.REACT_APP_API_URL;
+  const navigate = useNavigate();
 
-const [expenses,setExpenses] = useState([]);
-const [monthlyTotal,setMonthlyTotal] = useState(0);
-const [todayTotal,setTodayTotal] = useState(0);
+  const [expenses, setExpenses] = useState([]);
+  const [openMonth, setOpenMonth] = useState(null);
 
-const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
 
-useEffect(()=>{
+  useEffect(() => {
+    fetchExpenses();
+  }, []);
 
-fetchData();
+  const fetchExpenses = async () => {
 
-},[]);
+    try {
 
-const fetchData = async()=>{
+      const token = localStorage.getItem("token");
 
-const token = localStorage.getItem("token");
+      const res = await axios.get(`${API}/api/expenses`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
 
-const config = {
-headers:{Authorization:`Bearer ${token}`}
-};
+      setExpenses(Array.isArray(res.data) ? res.data : []);
 
-const date = new Date();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-const [expRes,totalRes] = await Promise.all([
-axios.get(`${API}/api/expenses`,config),
-axios.get(`${API}/api/expenses/total?month=${date.getMonth()+1}&year=${date.getFullYear()}`,config)
-]);
+  const monthlyTotal = useMemo(() => {
 
-setExpenses(expRes.data);
+    const now = new Date();
 
-setMonthlyTotal(totalRes.data.total || 0);
+    return expenses
+      .filter(e => {
+        const d = new Date(e.date);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, e) => sum + Number(e.amount), 0);
 
-};
+  }, [expenses]);
 
-const todayExpenses = useMemo(()=>{
+  const todayExpenses = useMemo(() => {
+    return expenses.filter(e => e.date.split("T")[0] === today);
+  }, [expenses, today]);
 
-return expenses.filter(e => e.date.split("T")[0] === today);
+  const todayTotal = todayExpenses.reduce((s, e) => s + Number(e.amount), 0);
 
-},[expenses]);
+  const categoryData = useMemo(() => {
 
-useEffect(()=>{
+    const map = {};
 
-const total = todayExpenses.reduce((s,e)=>s+Number(e.amount),0);
+    expenses.forEach(e => {
+      if (!map[e.category]) map[e.category] = 0;
+      map[e.category] += Number(e.amount);
+    });
 
-setTodayTotal(total);
+    return Object.keys(map).map(k => ({ name: k, value: map[k] }));
 
-},[todayExpenses]);
+  }, [expenses]);
 
-const categoryData = useMemo(()=>{
+  const monthlyData = useMemo(() => {
 
-const map = {};
+    const map = {};
 
-expenses.forEach(e=>{
-if(!map[e.category]) map[e.category] = 0;
-map[e.category]+=Number(e.amount);
-});
+    expenses.forEach(e => {
 
-return Object.keys(map).map(k=>({name:k,value:map[k]}));
+      const m = new Date(e.date).toLocaleString("default", { month: "short" });
 
-},[expenses]);
+      if (!map[m]) map[m] = 0;
 
-const monthlyData = useMemo(()=>{
+      map[m] += Number(e.amount);
 
-const map={};
+    });
 
-expenses.forEach(e=>{
+    return Object.keys(map).map(k => ({ month: k, amount: map[k] }));
 
-const m = new Date(e.date).toLocaleString("default",{month:"short"});
+  }, [expenses]);
 
-if(!map[m]) map[m]=0;
+  const dailyData = useMemo(() => {
 
-map[m]+=Number(e.amount);
+    const map = {};
 
-});
+    expenses.forEach(e => {
 
-return Object.keys(map).map(m=>({month:m,amount:map[m]}));
+      const d = new Date(e.date).getDate();
 
-},[expenses]);
+      if (!map[d]) map[d] = 0;
 
-const dailyData = useMemo(()=>{
+      map[d] += Number(e.amount);
 
-const map={};
+    });
 
-expenses.forEach(e=>{
+    return Object.keys(map).map(k => ({ day: k, amount: map[k] }));
 
-const d = new Date(e.date).getDate();
+  }, [expenses]);
 
-if(!map[d]) map[d]=0;
+  const groupedExpenses = useMemo(() => {
 
-map[d]+=Number(e.amount);
+    const map = {};
 
-});
+    expenses.forEach(e => {
 
-return Object.keys(map).map(d=>({day:d,amount:map[d]}));
+      const key = new Date(e.date).toLocaleString("default", {
+        month: "long",
+        year: "numeric"
+      });
 
-},[expenses]);
+      if (!map[key]) map[key] = [];
 
-return(
+      map[key].push(e);
 
-<div className="min-h-screen bg-[#07050c] text-white p-8">
+    });
 
-{/* HEADER */}
+    return map;
 
-<div className="mb-16">
+  }, [expenses]);
 
-<h2 className="text-purple-400 uppercase text-sm mb-2">
-Monthly Expense
-</h2>
+  const toggleMonth = (month) => {
+    setOpenMonth(openMonth === month ? null : month);
+  };
 
-<h1 className="text-7xl font-black text-yellow-300">
-₹{monthlyTotal.toLocaleString()}
-</h1>
+  return (
 
-<div className="mt-8">
+    <div className="min-h-screen bg-[#07050c] text-white p-8 relative">
 
-<h3 className="text-sm text-purple-400">
-Today's Spending
-</h3>
+      {/* BACKGROUND GLOW */}
 
-<h2 className="text-4xl font-bold text-purple-300">
-₹{todayTotal}
-</h2>
+      <div className="absolute w-[500px] h-[500px] bg-purple-700 opacity-20 blur-[160px] top-0 left-0" />
+      <div className="absolute w-[500px] h-[500px] bg-pink-600 opacity-20 blur-[160px] bottom-0 right-0" />
 
-</div>
+      {/* HEADER */}
 
-</div>
+      <div className="mb-16">
 
-{/* LIVE FEED */}
+        <h2 className="text-purple-400 text-sm">Monthly Expense</h2>
 
-<div className="mb-16">
+        <h1 className="text-7xl font-black text-yellow-300">
+          ₹{monthlyTotal}
+        </h1>
 
-<h2 className="text-xl mb-6 font-bold text-purple-300">
-Live Feed (Today)
-</h2>
+        <div className="mt-8">
+          <p className="text-purple-400">Today</p>
+          <h2 className="text-4xl text-purple-300 font-bold">
+            ₹{todayTotal}
+          </h2>
+        </div>
 
-<div className="flex gap-6 overflow-x-auto">
+      </div>
 
-{todayExpenses.map(exp=>(
+      {/* LIVE FEED */}
 
-<motion.div
-key={exp.id}
-whileHover={{scale:1.05}}
-className="bg-purple-900/20 p-6 rounded-2xl min-w-[250px]"
->
+      <div className="mb-16">
 
-<h3 className="text-lg font-bold">{exp.title}</h3>
+        <h2 className="text-xl font-bold mb-6 text-purple-300">
+          Live Feed (Today)
+        </h2>
 
-<p className="text-yellow-300 text-xl">
-₹{exp.amount}
-</p>
+        <div className="flex gap-6 overflow-x-auto">
 
-<p className="text-xs text-purple-300">
-{exp.category}
-</p>
+          {todayExpenses.map(exp => (
 
-</motion.div>
+            <motion.div
+              key={exp.id}
+              whileHover={{ scale: 1.08, rotateX: 3 }}
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 4, repeat: Infinity }}
+              className="min-w-[240px] bg-white/5 backdrop-blur-xl p-6 rounded-2xl shadow-xl"
+            >
 
-))}
+              <h3 className="font-bold text-lg">{exp.title}</h3>
 
-</div>
+              <p className="text-yellow-300 text-2xl">
+                ₹{exp.amount}
+              </p>
 
-</div>
+              <p className="text-xs text-purple-300">
+                {exp.category}
+              </p>
 
-{/* ANALYTICS */}
+            </motion.div>
 
-<div className="grid md:grid-cols-3 gap-10 mb-16">
+          ))}
 
-{/* PIE */}
+        </div>
 
-<div className="bg-[#120c1f] p-6 rounded-2xl">
+      </div>
 
-<h3 className="mb-4 font-bold">
-Category Analysis
-</h3>
+      {/* CHARTS */}
 
-<ResponsiveContainer width="100%" height={220}>
+      <div className="grid md:grid-cols-3 gap-8 mb-16">
 
-<PieChart>
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          className="bg-white/5 p-6 rounded-3xl backdrop-blur-xl"
+        >
 
-<Pie
-data={categoryData}
-dataKey="value"
-outerRadius={80}
->
+          <h3 className="mb-4">Category</h3>
 
-{categoryData.map((_,i)=>(
-<Cell key={i} fill={COLORS[i % COLORS.length]} />
-))}
+          <ResponsiveContainer width="100%" height={220}>
 
-</Pie>
+            <PieChart>
 
-<Tooltip/>
+              <Pie data={categoryData} dataKey="value" outerRadius={80}>
 
-</PieChart>
+                {categoryData.map((_, i) => (
+                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                ))}
 
-</ResponsiveContainer>
+              </Pie>
 
-</div>
+              <Tooltip />
 
-{/* BAR */}
+            </PieChart>
 
-<div className="bg-[#120c1f] p-6 rounded-2xl">
+          </ResponsiveContainer>
 
-<h3 className="mb-4 font-bold">
-Monthly Comparison
-</h3>
+        </motion.div>
 
-<ResponsiveContainer width="100%" height={220}>
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          className="bg-white/5 p-6 rounded-3xl backdrop-blur-xl"
+        >
 
-<BarChart data={monthlyData}>
+          <h3 className="mb-4">Monthly</h3>
 
-<XAxis dataKey="month"/>
+          <ResponsiveContainer width="100%" height={220}>
 
-<Bar dataKey="amount" fill="#9333ea"/>
+            <BarChart data={monthlyData}>
 
-<Tooltip/>
+              <XAxis dataKey="month" />
 
-</BarChart>
+              <Bar dataKey="amount" fill="#9333ea" />
 
-</ResponsiveContainer>
+              <Tooltip />
 
-</div>
+            </BarChart>
 
-{/* LINE */}
+          </ResponsiveContainer>
 
-<div className="bg-[#120c1f] p-6 rounded-2xl">
+        </motion.div>
 
-<h3 className="mb-4 font-bold">
-Daily Trend
-</h3>
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          className="bg-white/5 p-6 rounded-3xl backdrop-blur-xl"
+        >
 
-<ResponsiveContainer width="100%" height={220}>
+          <h3 className="mb-4">Daily</h3>
 
-<LineChart data={dailyData}>
+          <ResponsiveContainer width="100%" height={220}>
 
-<CartesianGrid strokeDasharray="3 3"/>
+            <LineChart data={dailyData}>
 
-<XAxis dataKey="day"/>
+              <CartesianGrid strokeDasharray="3 3" />
 
-<YAxis/>
+              <XAxis dataKey="day" />
 
-<Line
-type="monotone"
-dataKey="amount"
-stroke="#c084fc"
-strokeWidth={3}
-/>
+              <YAxis />
 
-<Tooltip/>
+              <Line type="monotone" dataKey="amount" stroke="#c084fc" strokeWidth={3} />
 
-</LineChart>
+              <Tooltip />
 
-</ResponsiveContainer>
+            </LineChart>
 
-</div>
+          </ResponsiveContainer>
 
-</div>
+        </motion.div>
 
-{/* HISTORY */}
+      </div>
 
-<div>
+      {/* HISTORY FOLDERS */}
 
-<h2 className="text-2xl font-bold mb-6 text-purple-300">
-Expense History
-</h2>
+      <div>
 
-<div className="space-y-4">
+        <h2 className="text-2xl font-bold mb-6 text-purple-300">
+          Expense History
+        </h2>
 
-{expenses.map(e=>(
+        {Object.keys(groupedExpenses).map(month => (
 
-<div
-key={e.id}
-className="flex justify-between bg-white/5 p-4 rounded-xl"
->
+          <div key={month} className="mb-6">
 
-<div>
+            <button
+              onClick={() => toggleMonth(month)}
+              className="w-full flex justify-between bg-purple-900/30 p-4 rounded-xl"
+            >
+              <span className="font-bold text-lg">📁 {month}</span>
+            </button>
 
-<p className="font-bold">{e.title}</p>
+            {openMonth === month && (
 
-<p className="text-xs text-purple-300">
-{new Date(e.date).toDateString()}
-</p>
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 space-y-2"
+              >
 
-</div>
+                {groupedExpenses[month]
+                  .sort((a, b) => new Date(a.date) - new Date(b.date))
+                  .map(exp => (
 
-<p className="text-yellow-300 font-bold">
-₹{e.amount}
-</p>
+                    <div
+                      key={exp.id}
+                      className="flex justify-between bg-white/5 p-3 rounded-lg"
+                    >
 
-</div>
+                      <div>
+                        <p className="font-bold">{exp.title}</p>
+                        <p className="text-xs text-purple-300">
+                          {new Date(exp.date).toDateString()}
+                        </p>
+                      </div>
 
-))}
+                      <p className="text-yellow-300 font-bold">
+                        ₹{exp.amount}
+                      </p>
 
-</div>
+                    </div>
 
-</div>
+                  ))}
 
-</div>
+              </motion.div>
 
-);
+            )}
 
+          </div>
+
+        ))}
+
+      </div>
+
+      {/* ADD EXPENSE BUTTON */}
+
+      <button
+        onClick={() => navigate("/add-expense")}
+        className="fixed bottom-10 right-10 bg-purple-600 hover:bg-purple-700
+        text-white px-6 py-4 rounded-full shadow-2xl transition transform hover:scale-110"
+      >
+        + Add Expense
+      </button>
+
+    </div>
+  );
 }
 
 export default Dashboard;
