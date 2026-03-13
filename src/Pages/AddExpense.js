@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 
 function AddExpense() {
 
+  
   const API = process.env.REACT_APP_API_URL;
   const navigate = useNavigate();
 
@@ -21,9 +22,16 @@ function AddExpense() {
 
       const token = localStorage.getItem("token");
 
+      console.log("Token:",token);
+
       await axios.post(
         `${API}/api/expenses`,
-        { title, amount, category, date },
+        {
+          title,
+          amount: Number(amount),
+          category,
+          date
+        },
         {
           headers:{
             Authorization:`Bearer ${token}`
@@ -31,17 +39,21 @@ function AddExpense() {
         }
       );
 
+      alert("Expense saved successfully");
+
       navigate("/dashboard");
 
     }catch(err){
-      console.log("Error adding expense:",err);
+
+      console.log("Error adding expense:",err.response || err);
+
       alert("Failed to add expense");
+
     }
 
   };
 
   return (
-
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-purple-900 to-indigo-900 text-white">
 
       <motion.form
@@ -113,9 +125,7 @@ function AddExpense() {
       </motion.form>
 
     </div>
-
   );
-
 }
 
 export default AddExpense;
