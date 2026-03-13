@@ -9,11 +9,11 @@ BarChart, Bar
 } from "recharts";
 
 const API = process.env.REACT_APP_API_URL ;
-const navigate = useNavigate();
-
 const COLORS = ["#a855f7","#6366f1","#22c55e","#f97316","#ef4444"];
 
 function Dashboard(){
+
+    const navigate = useNavigate();
 
 const [expenses,setExpenses] = useState([]);
 const [showModal,setShowModal] = useState(false);
