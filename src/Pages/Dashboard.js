@@ -7,7 +7,7 @@ LineChart, Line, XAxis, YAxis, CartesianGrid,
 BarChart, Bar
 } from "recharts";
 
-const API = process.env.REACT_APP_API_URL || "http://localhost:8080";
+const API = process.env.REACT_APP_API_URL ;
 
 const COLORS = ["#a855f7","#6366f1","#22c55e","#f97316","#ef4444"];
 
@@ -99,9 +99,12 @@ fetchExpenses();
 };
 
 const logout=()=>{
-localStorage.clear();
+localStorage.removeItem("token");
+localStorage.removeItem("name");
 window.location.href="/login";
 };
+
+/* TOTALS */
 
 const totalExpense = expenses.reduce((sum,e)=>sum+Number(e.amount),0);
 
@@ -110,6 +113,11 @@ const today = new Date().toISOString().split("T")[0];
 const todayExpense = expenses
 .filter(e=>e.date===today)
 .reduce((sum,e)=>sum+Number(e.amount),0);
+
+/* TOTAL TRANSACTIONS (ADDED) */
+const totalTransactions = expenses.length;
+
+/* CATEGORY DATA */
 
 const categoryData = Object.values(
 expenses.reduce((acc,exp)=>{
@@ -122,7 +130,55 @@ acc[cat].value += Number(exp.amount);
 
 return acc;
 
-},{}));
+},{})
+);
+
+/* SORTED DATA */
+
+const sortedExpenses = [...expenses].sort(
+(a,b)=> new Date(a.date) - new Date(b.date)
+);
+
+/* TODAY LIVE FEED */
+
+const todayExpenses = expenses
+.filter(e => e.date === today)
+.sort((a,b)=> new Date(b.date) - new Date(a.date));
+
+/* MONTHLY DATA */
+
+const monthlyData = Object.values(
+expenses.reduce((acc,exp)=>{
+
+const month = new Date(exp.date)
+.toLocaleString("default",{month:"short",year:"numeric"});
+
+if(!acc[month]) acc[month] = {month,total:0};
+
+acc[month].total += Number(exp.amount);
+
+return acc;
+
+},{})
+);
+
+/* HISTORY */
+
+const history = Object.entries(
+expenses.reduce((acc,exp)=>{
+
+const month = new Date(exp.date)
+.toLocaleString("default",{month:"long",year:"numeric"});
+
+if(!acc[month]) acc[month] = [];
+
+acc[month].push(exp);
+
+return acc;
+
+},{})
+)
+.sort((a,b)=> new Date(b[1][0].date) - new Date(a[1][0].date));
 
 return(
 
@@ -132,8 +188,8 @@ return(
 
 <div className="flex justify-between items-center mb-12">
 
-<h1 className="text-3xl font-bold">
-Smart Expense Tracker
+<h1 className="logo-font text-5xl bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+SmartExpense
 </h1>
 
 <div className="flex gap-4 items-center">
@@ -155,52 +211,114 @@ Logout
 
 {/* STATS */}
 
-<div className="grid md:grid-cols-3 gap-6 mb-12">
+<div className="grid md:grid-cols-4 gap-6 mb-12">
+
+{/* MONTHLY EXPENSE BURN (LARGEST) */}
 
 <motion.div
 whileHover={{scale:1.05}}
-className="bg-white/10 p-6 rounded-xl"
+className="bg-white/10 p-10 rounded-xl md:col-span-2 flex flex-col justify-center"
 >
 
-<h3 className="text-gray-300">
-Total Expense
+<h3 className="text-gray-300 text-xl">
+Monthly Expense Burn
 </h3>
 
-<p className="text-3xl font-bold text-purple-400">
+<p className="text-6xl font-bold text-purple-400 mt-2">
 ₹{totalExpense}
 </p>
 
 </motion.div>
 
+{/* TODAY EXPENSE */}
+
 <motion.div
 whileHover={{scale:1.05}}
-className="bg-white/10 p-6 rounded-xl"
+className="bg-white/10 p-8 rounded-xl flex flex-col justify-center"
 >
 
-<h3 className="text-gray-300">
+<h3 className="text-gray-300 text-lg">
 Today's Expense
 </h3>
 
-<p className="text-3xl font-bold text-pink-400">
+<p className="text-4xl font-bold text-pink-400 mt-2">
 ₹{todayExpense}
 </p>
 
 </motion.div>
 
-<motion.div
-whileHover={{scale:1.05}}
-className="bg-white/10 p-6 rounded-xl"
+{/* ADD EXPENSE + TOTAL TRANSACTIONS */}
+
+<div className="flex flex-col gap-4 items-center justify-center">
+
+<button
+onClick={()=>setShowModal(true)}
+className="bg-purple-600 px-6 py-3 rounded-xl"
 >
++ Add Expense
+</button>
 
-<h3 className="text-gray-300">
+<div className="bg-white/10 px-6 py-3 rounded-xl text-center">
+<p className="text-gray-300 text-sm">
 Total Transactions
-</h3>
-
-<p className="text-3xl font-bold text-green-400">
-{expenses.length}
 </p>
 
-</motion.div>
+<p className="text-2xl font-bold text-green-400">
+{totalTransactions}
+</p>
+</div>
+
+</div>
+
+</div>
+
+{/* LIVE FEED */}
+
+<div className="bg-white/10 rounded-xl p-8 mb-12 border border-purple-500/30">
+
+<h2 className="text-2xl font-bold mb-6 text-purple-300">
+Today's Live Expenses
+</h2>
+
+{todayExpenses.map(exp => (
+
+<div
+key={exp.id}
+className="flex justify-between items-center border-b border-white/20 py-3"
+>
+
+<div>
+<p className="font-semibold">{exp.title}</p>
+<p className="text-sm text-gray-400">
+{exp.category} • {exp.date}
+</p>
+</div>
+
+<div className="flex gap-4 items-center">
+
+<span className="text-green-400 font-bold">
+₹{exp.amount}
+</span>
+
+<button
+onClick={()=>editExpense(exp)}
+className="text-yellow-400"
+>
+Edit
+</button>
+
+<button
+onClick={()=>deleteExpense(exp.id)}
+className="text-red-400"
+>
+Delete
+</button>
+
+</div>
+
+</div>
+
+))}
 
 </div>
 
@@ -243,7 +361,7 @@ Daily Trend
 
 <ResponsiveContainer width="100%" height={250}>
 
-<LineChart data={expenses}>
+<LineChart data={sortedExpenses}>
 
 <CartesianGrid strokeDasharray="3 3"/>
 <XAxis dataKey="date"/>
@@ -260,24 +378,50 @@ Daily Trend
 
 </div>
 
-{/* ADD BUTTON */}
+{/* MONTHLY EXPENSE BURN GRAPH */}
 
-<button
-onClick={()=>setShowModal(true)}
-className="bg-purple-600 px-6 py-3 rounded-xl mb-8"
->
-+ Add Expense
-</button>
+<div className="bg-white/10 p-10 rounded-xl mb-16">
 
-{/* EXPENSE LIST */}
+<h3 className="mb-6 text-2xl font-bold text-purple-300">
+Monthly Expense Burn
+</h3>
 
-<div className="bg-white/10 rounded-xl p-6">
+<ResponsiveContainer width="100%" height={350}>
 
-<h2 className="text-xl font-bold mb-4">
-Recent Expenses
+<BarChart data={monthlyData}>
+
+<CartesianGrid strokeDasharray="3 3"/>
+<XAxis dataKey="month"/>
+<YAxis/>
+<Tooltip/>
+
+<Bar dataKey="total" fill="#6366f1"/>
+
+</BarChart>
+
+</ResponsiveContainer>
+
+</div>
+
+{/* HISTORY */}
+
+<div className="bg-white/10 p-8 rounded-xl mt-16">
+
+<h2 className="text-2xl font-bold text-purple-300 mb-8">
+Expense History
 </h2>
 
-{expenses.map(exp=>(
+{history.map(([month,items])=>(
+
+<div key={month} className="mb-8">
+
+<h3 className="text-lg font-semibold text-purple-400 mb-4">
+📁 {month}
+</h3>
+
+{items
+.sort((a,b)=> new Date(b.date) - new Date(a.date))
+.map(exp=>(
 
 <div
 key={exp.id}
@@ -317,6 +461,10 @@ Delete
 </button>
 
 </div>
+
+</div>
+
+))}
 
 </div>
 

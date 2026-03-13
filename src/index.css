@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@400;700&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Pacifico&display=swap');
 
 @keyframes starsMove {
   from { transform: translateY(0); }
@@ -16,4 +16,8 @@
   background: url("https://www.transparenttextures.com/patterns/stardust.png");
   animation: starsMove 120s linear infinite;
   opacity: 0.4;
+}
+
+.logo-font{
+font-family: 'Pacifico', cursive;
 }
