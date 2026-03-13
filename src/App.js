@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./Pages/Login";
 import Dashboard from "./Pages/Dashboard";
-import AddExpense from "./Pages/AddExpense";   // ← add this
+import AddExpense from "./Pages/AddExpense";
 
 function App() {
   return (
@@ -12,7 +12,7 @@ function App() {
 
         <Route path="/dashboard" element={<Dashboard />} />
 
-        <Route path="/add-expense" element={<AddExpense />} />   {/* add this */}
+        <Route path="/add-expense" element={<AddExpense />} />
 
       </Routes>
     </BrowserRouter>

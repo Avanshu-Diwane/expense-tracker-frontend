@@ -1,373 +1,410 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid
+PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+LineChart, Line, XAxis, YAxis, CartesianGrid,
+BarChart, Bar
 } from "recharts";
 
-const COLORS = ["#a855f7", "#9333ea", "#c084fc", "#7e22ce", "#6d28d9"];
+const API = process.env.REACT_APP_API_URL || "http://localhost:8080";
 
-function Dashboard() {
+const COLORS = ["#a855f7","#6366f1","#22c55e","#f97316","#ef4444"];
 
-  const API = process.env.REACT_APP_API_URL;
-  const navigate = useNavigate();
+function Dashboard(){
 
-  const [expenses, setExpenses] = useState([]);
-  const [openMonth, setOpenMonth] = useState(null);
+const [expenses,setExpenses] = useState([]);
+const [showModal,setShowModal] = useState(false);
 
-  const today = new Date().toISOString().split("T")[0];
+const [form,setForm] = useState({
+title:"",
+amount:"",
+category:"Food",
+date:""
+});
 
-  useEffect(() => {
-    fetchExpenses();
-  }, []);
+useEffect(()=>{
+fetchExpenses();
 
-  const fetchExpenses = async () => {
+const interval = setInterval(()=>{
+fetchExpenses();
+},60000);
 
-    try {
+return ()=>clearInterval(interval);
 
-      const token = localStorage.getItem("token");
+},[]);
 
-      const res = await axios.get(`${API}/api/expenses`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+const fetchExpenses = async () => {
+try{
 
-      setExpenses(Array.isArray(res.data) ? res.data : []);
+const token = localStorage.getItem("token");
 
-    } catch (err) {
-      console.error(err);
-    }
-  };
+const res = await axios.get(`${API}/api/expenses`,{
+headers:{Authorization:`Bearer ${token}`}
+});
 
-  const monthlyTotal = useMemo(() => {
+setExpenses(res.data);
 
-    const now = new Date();
+}catch(err){
+console.log(err);
+}
+};
 
-    return expenses
-      .filter(e => {
-        const d = new Date(e.date);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      })
-      .reduce((sum, e) => sum + Number(e.amount), 0);
+const handleChange=(e)=>{
+const {name,value}=e.target;
 
-  }, [expenses]);
+setForm({
+...form,
+[name]: name==="amount" ? Number(value) : value
+});
+};
 
-  const todayExpenses = useMemo(() => {
-    return expenses.filter(e => e.date.split("T")[0] === today);
-  }, [expenses, today]);
+const addExpense=async(e)=>{
+e.preventDefault();
 
-  const todayTotal = todayExpenses.reduce((s, e) => s + Number(e.amount), 0);
+try{
 
-  const categoryData = useMemo(() => {
+const token = localStorage.getItem("token");
 
-    const map = {};
+await axios.post(`${API}/api/expenses`,form,{
+headers:{Authorization:`Bearer ${token}`}
+});
 
-    expenses.forEach(e => {
-      if (!map[e.category]) map[e.category] = 0;
-      map[e.category] += Number(e.amount);
-    });
+setShowModal(false);
+fetchExpenses();
 
-    return Object.keys(map).map(k => ({ name: k, value: map[k] }));
+}catch(err){
+console.log(err);
+}
+};
 
-  }, [expenses]);
+const today = new Date().toISOString().split("T")[0];
+const currentMonth = new Date().getMonth();
+const currentYear = new Date().getFullYear();
 
-  const monthlyData = useMemo(() => {
+const dailyExpense = expenses
+.filter(exp => exp.date === today)
+.reduce((sum,e)=>sum+Number(e.amount),0);
 
-    const map = {};
+const monthlyExpense = expenses
+.filter(exp=>{
+const d = new Date(exp.date);
+return d.getMonth()===currentMonth && d.getFullYear()===currentYear;
+})
+.reduce((sum,e)=>sum+Number(e.amount),0);
 
-    expenses.forEach(e => {
+const todayExpenses = expenses.filter(exp=>exp.date===today);
 
-      const m = new Date(e.date).toLocaleString("default", { month: "short" });
+const categoryData = Object.values(
+expenses.reduce((acc,exp)=>{
 
-      if (!map[m]) map[m] = 0;
+const cat = exp.category || "Other";
 
-      map[m] += Number(e.amount);
+if(!acc[cat]) acc[cat]={name:cat,value:0};
 
-    });
+acc[cat].value += Number(exp.amount);
 
-    return Object.keys(map).map(k => ({ month: k, amount: map[k] }));
+return acc;
 
-  }, [expenses]);
+},{})
+);
 
-  const dailyData = useMemo(() => {
+const dailyChart = Object.values(
+expenses.reduce((acc,exp)=>{
 
-    const map = {};
+const date = exp.date;
 
-    expenses.forEach(e => {
+if(!acc[date]) acc[date]={date,amount:0};
 
-      const d = new Date(e.date).getDate();
+acc[date].amount += Number(exp.amount);
 
-      if (!map[d]) map[d] = 0;
+return acc;
 
-      map[d] += Number(e.amount);
+},{})
+);
 
-    });
+const monthlyChart = Object.values(
+expenses.reduce((acc,exp)=>{
 
-    return Object.keys(map).map(k => ({ day: k, amount: map[k] }));
+const month = new Date(exp.date)
+.toLocaleString("default",{month:"short"});
 
-  }, [expenses]);
+if(!acc[month]) acc[month]={month,amount:0};
 
-  const groupedExpenses = useMemo(() => {
+acc[month].amount += Number(exp.amount);
 
-    const map = {};
+return acc;
 
-    expenses.forEach(e => {
+},{})
+);
 
-      const key = new Date(e.date).toLocaleString("default", {
-        month: "long",
-        year: "numeric"
-      });
+const monthlyFolders = expenses.reduce((acc,exp)=>{
 
-      if (!map[key]) map[key] = [];
+const month = new Date(exp.date)
+.toLocaleString("default",{month:"long"});
 
-      map[key].push(e);
+if(!acc[month]) acc[month]=[];
 
-    });
+acc[month].push(exp);
 
-    return map;
+return acc;
 
-  }, [expenses]);
+},{});
 
-  const toggleMonth = (month) => {
-    setOpenMonth(openMonth === month ? null : month);
-  };
+return(
 
-  return (
+<div className="min-h-screen text-white relative overflow-hidden">
 
-    <div className="min-h-screen bg-[#07050c] text-white p-8 relative">
+<div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-black to-purple-900"></div>
 
-      {/* BACKGROUND GLOW */}
+<div className="relative z-10 p-10">
 
-      <div className="absolute w-[500px] h-[500px] bg-purple-700 opacity-20 blur-[160px] top-0 left-0" />
-      <div className="absolute w-[500px] h-[500px] bg-pink-600 opacity-20 blur-[160px] bottom-0 right-0" />
+<h1 className="text-4xl font-bold mb-10">
+Smart Expense Tracker
+</h1>
 
-      {/* HEADER */}
+{/* Monthly Expense */}
 
-      <div className="mb-16">
+<div className="text-center mb-6">
 
-        <h2 className="text-purple-400 text-sm">Monthly Expense</h2>
+<h1 className="text-6xl font-extrabold text-purple-400">
+₹{monthlyExpense}
+</h1>
 
-        <h1 className="text-7xl font-black text-yellow-300">
-          ₹{monthlyTotal}
-        </h1>
+<p className="text-lg text-gray-300">
+Monthly Expense
+</p>
 
-        <div className="mt-8">
-          <p className="text-purple-400">Today</p>
-          <h2 className="text-4xl text-purple-300 font-bold">
-            ₹{todayTotal}
-          </h2>
-        </div>
+</div>
 
-      </div>
+{/* Daily Expense */}
 
-      {/* LIVE FEED */}
+<div className="text-center mb-10">
 
-      <div className="mb-16">
+<h2 className="text-4xl font-bold text-pink-400">
+₹{dailyExpense}
+</h2>
 
-        <h2 className="text-xl font-bold mb-6 text-purple-300">
-          Live Feed (Today)
-        </h2>
+<p className="text-lg text-gray-300">
+Today's Expense
+</p>
 
-        <div className="flex gap-6 overflow-x-auto">
+</div>
 
-          {todayExpenses.map(exp => (
+<button
+onClick={()=>setShowModal(true)}
+className="bg-purple-600 px-6 py-3 rounded-xl font-bold mb-12"
+>
++ Add Expense
+</button>
 
-            <motion.div
-              key={exp.id}
-              whileHover={{ scale: 1.08, rotateX: 3 }}
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 4, repeat: Infinity }}
-              className="min-w-[240px] bg-white/5 backdrop-blur-xl p-6 rounded-2xl shadow-xl"
-            >
+{/* Today's Feed */}
 
-              <h3 className="font-bold text-lg">{exp.title}</h3>
+<div className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl mb-12">
 
-              <p className="text-yellow-300 text-2xl">
-                ₹{exp.amount}
-              </p>
+<h2 className="text-xl font-bold mb-4">
+Today's Spending
+</h2>
 
-              <p className="text-xs text-purple-300">
-                {exp.category}
-              </p>
+{todayExpenses.length===0 && <p>No spending today</p>}
 
-            </motion.div>
+{todayExpenses.map(exp=>(
+<div
+key={exp.id}
+className="flex justify-between border-b border-white/20 py-2"
+>
+<span>{exp.title}</span>
+<span>₹{exp.amount}</span>
+</div>
+))}
 
-          ))}
+</div>
 
-        </div>
+{/* Charts */}
 
-      </div>
+<div className="grid md:grid-cols-3 gap-8 mb-16">
 
-      {/* CHARTS */}
+<div className="bg-white/10 p-6 rounded-2xl">
 
-      <div className="grid md:grid-cols-3 gap-8 mb-16">
+<h3 className="mb-4">Category Analysis</h3>
 
-        <motion.div
-          whileHover={{ scale: 1.03 }}
-          className="bg-white/5 p-6 rounded-3xl backdrop-blur-xl"
-        >
+<ResponsiveContainer width="100%" height={250}>
 
-          <h3 className="mb-4">Category</h3>
+<PieChart>
 
-          <ResponsiveContainer width="100%" height={220}>
+<Pie
+data={categoryData}
+dataKey="value"
+nameKey="name"
+outerRadius={90}
+>
 
-            <PieChart>
+{categoryData.map((entry,index)=>(
+<Cell key={index} fill={COLORS[index % COLORS.length]} />
+))}
 
-              <Pie data={categoryData} dataKey="value" outerRadius={80}>
+</Pie>
 
-                {categoryData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
+<Tooltip/>
+<Legend/>
 
-              </Pie>
+</PieChart>
 
-              <Tooltip />
+</ResponsiveContainer>
 
-            </PieChart>
+</div>
 
-          </ResponsiveContainer>
+<div className="bg-white/10 p-6 rounded-2xl">
 
-        </motion.div>
+<h3 className="mb-4">Monthly Analysis</h3>
 
-        <motion.div
-          whileHover={{ scale: 1.03 }}
-          className="bg-white/5 p-6 rounded-3xl backdrop-blur-xl"
-        >
+<ResponsiveContainer width="100%" height={250}>
 
-          <h3 className="mb-4">Monthly</h3>
+<BarChart data={monthlyChart}>
 
-          <ResponsiveContainer width="100%" height={220}>
+<XAxis dataKey="month"/>
+<YAxis/>
+<Tooltip/>
 
-            <BarChart data={monthlyData}>
+<Bar dataKey="amount" fill="#6366f1"/>
 
-              <XAxis dataKey="month" />
+</BarChart>
 
-              <Bar dataKey="amount" fill="#9333ea" />
+</ResponsiveContainer>
 
-              <Tooltip />
+</div>
 
-            </BarChart>
+<div className="bg-white/10 p-6 rounded-2xl">
 
-          </ResponsiveContainer>
+<h3 className="mb-4">Daily Analysis</h3>
 
-        </motion.div>
+<ResponsiveContainer width="100%" height={250}>
 
-        <motion.div
-          whileHover={{ scale: 1.03 }}
-          className="bg-white/5 p-6 rounded-3xl backdrop-blur-xl"
-        >
+<LineChart data={dailyChart}>
 
-          <h3 className="mb-4">Daily</h3>
+<CartesianGrid strokeDasharray="3 3"/>
+<XAxis dataKey="date"/>
+<YAxis/>
+<Tooltip/>
 
-          <ResponsiveContainer width="100%" height={220}>
+<Line
+type="monotone"
+dataKey="amount"
+stroke="#a855f7"
+strokeWidth={3}
+/>
 
-            <LineChart data={dailyData}>
+</LineChart>
 
-              <CartesianGrid strokeDasharray="3 3" />
+</ResponsiveContainer>
 
-              <XAxis dataKey="day" />
+</div>
 
-              <YAxis />
+</div>
 
-              <Line type="monotone" dataKey="amount" stroke="#c084fc" strokeWidth={3} />
+{/* Expense History */}
 
-              <Tooltip />
+<h2 className="text-2xl font-bold mb-6">
+Expense History
+</h2>
 
-            </LineChart>
+<div className="grid md:grid-cols-3 gap-6">
 
-          </ResponsiveContainer>
+{Object.keys(monthlyFolders).map(month=>(
+<div
+key={month}
+className="bg-white/10 p-6 rounded-2xl"
+>
 
-        </motion.div>
+<h3 className="text-xl mb-4">
+{month}
+</h3>
 
-      </div>
+{monthlyFolders[month].map(exp=>(
+<div
+key={exp.id}
+className="flex justify-between border-b border-white/20 py-2"
+>
+<span>{exp.title}</span>
+<span>₹{exp.amount}</span>
+</div>
+))}
 
-      {/* HISTORY FOLDERS */}
+</div>
+))}
 
-      <div>
+</div>
 
-        <h2 className="text-2xl font-bold mb-6 text-purple-300">
-          Expense History
-        </h2>
+{/* Modal */}
 
-        {Object.keys(groupedExpenses).map(month => (
+{showModal &&(
 
-          <div key={month} className="mb-6">
+<div className="fixed inset-0 bg-black/60 flex items-center justify-center">
 
-            <button
-              onClick={() => toggleMonth(month)}
-              className="w-full flex justify-between bg-purple-900/30 p-4 rounded-xl"
-            >
-              <span className="font-bold text-lg">📁 {month}</span>
-            </button>
+<div className="bg-white/10 backdrop-blur-xl p-8 rounded-2xl w-[400px]">
 
-            {openMonth === month && (
+<h2 className="text-2xl mb-6">
+Add Expense
+</h2>
 
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-3 space-y-2"
-              >
+<form onSubmit={addExpense} className="space-y-4">
 
-                {groupedExpenses[month]
-                  .sort((a, b) => new Date(a.date) - new Date(b.date))
-                  .map(exp => (
+<input
+name="title"
+placeholder="Title"
+className="w-full p-3 rounded bg-black/30"
+onChange={handleChange}
+/>
 
-                    <div
-                      key={exp.id}
-                      className="flex justify-between bg-white/5 p-3 rounded-lg"
-                    >
+<input
+name="amount"
+type="number"
+placeholder="Amount"
+className="w-full p-3 rounded bg-black/30"
+onChange={handleChange}
+/>
 
-                      <div>
-                        <p className="font-bold">{exp.title}</p>
-                        <p className="text-xs text-purple-300">
-                          {new Date(exp.date).toDateString()}
-                        </p>
-                      </div>
+<select
+name="category"
+className="w-full p-3 rounded bg-black/30"
+onChange={handleChange}
+>
+<option>Food</option>
+<option>Travel</option>
+<option>Shopping</option>
+<option>Bills</option>
+<option>Other</option>
+</select>
 
-                      <p className="text-yellow-300 font-bold">
-                        ₹{exp.amount}
-                      </p>
+<input
+name="date"
+type="date"
+className="w-full p-3 rounded bg-black/30"
+onChange={handleChange}
+/>
 
-                    </div>
+<button
+type="submit"
+className="bg-purple-600 w-full py-3 rounded-xl font-bold"
+>
+Save Expense
+</button>
 
-                  ))}
+</form>
 
-              </motion.div>
+</div>
 
-            )}
+</div>
 
-          </div>
+)}
 
-        ))}
+</div>
 
-      </div>
+</div>
 
-      {/* ADD EXPENSE BUTTON */}
+);
 
-      <button
-        onClick={() => navigate("/add-expense")}
-        className="fixed bottom-10 right-10 bg-purple-600 hover:bg-purple-700
-        text-white px-6 py-4 rounded-full shadow-2xl transition transform hover:scale-110"
-      >
-        + Add Expense
-      </button>
-
-    </div>
-  );
 }
 
 export default Dashboard;
