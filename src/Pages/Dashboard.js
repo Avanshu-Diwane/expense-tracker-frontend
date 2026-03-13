@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "framer-motion";
 import {
@@ -8,6 +9,7 @@ BarChart, Bar
 } from "recharts";
 
 const API = process.env.REACT_APP_API_URL ;
+const navigate = useNavigate();
 
 const COLORS = ["#a855f7","#6366f1","#22c55e","#f97316","#ef4444"];
 
@@ -98,17 +100,17 @@ setEditingExpense(null);
 fetchExpenses();
 };
 
-const logout=()=>{
+const logout = () => {
 localStorage.removeItem("token");
 localStorage.removeItem("name");
-window.location.href="/login";
+navigate("/login");
 };
 
 /* TOTALS */
 
 const totalExpense = expenses.reduce((sum,e)=>sum+Number(e.amount),0);
 
-const today = new Date().toISOString().split("T")[0];
+const today = new Date().toLocaleDateString("en-CA");
 
 const todayExpense = expenses
 .filter(e=>e.date===today)
@@ -150,7 +152,7 @@ const todayExpenses = expenses
 const monthlyData = Object.values(
 expenses.reduce((acc,exp)=>{
 
-const month = new Date(exp.date)
+const month = new Date(exp.date + "T00:00:00")
 .toLocaleString("default",{month:"short",year:"numeric"});
 
 if(!acc[month]) acc[month] = {month,total:0};
@@ -480,9 +482,23 @@ Delete
 
 <div className="bg-white/10 p-8 rounded-xl w-[400px]">
 
-<h2 className="text-xl mb-6">
+<div className="flex justify-between items-center mb-6">
+
+<h2 className="text-xl">
 {editingExpense ? "Edit Expense" : "Add Expense"}
 </h2>
+
+<button
+onClick={()=>{
+setShowModal(false);
+setEditingExpense(null);
+}}
+className="text-red-400 text-xl"
+>
+✖
+</button>
+
+</div>
 
 <form
 onSubmit={editingExpense ? updateExpense : addExpense}
