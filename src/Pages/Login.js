@@ -1,11 +1,18 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 function Login() {
   const [isSignup, setIsSignup] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false); // Added for pop-up logic
   const navigate = useNavigate();
   const loginRef = useRef(null);
+
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    // This wakes up the Render server as soon as the page loads
+    fetch(process.env.REACT_APP_API_URL).catch(() => {});
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,65 +20,68 @@ function Login() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   /* ---------------- AUTH FUNCTION ---------------- */
-const handleAuth = async () => {
-  const API_URL = process.env.REACT_APP_API_URL; // Consistent with Dashboard
+  const handleAuth = async () => {
+    setLoading(true);
+    const API_URL = process.env.REACT_APP_API_URL;
 
-  if (isSignup) {
-    if (password !== confirmPassword) {
-      alert("Passwords do not match");
-      return;
-    }
-    try {
-      const response = await fetch(`${API_URL}/api/users/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: fullName, email: email, password: password })
-      });
-
-      if (response.ok) {
-        alert("Account created successfully!");
-        setIsSignup(false);
-      } else {
-        alert("Signup failed: User may already exist");
+    if (isSignup) {
+      if (password !== confirmPassword) {
+        alert("Passwords do not match");
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error("Signup Error:", error);
-      alert("Cannot connect to server");
-    }
-  } else {
-    // LOGIN LOGIC
-    try {
-      const response = await fetch(`${API_URL}/api/users/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email, password: password })
-      });
+      try {
+        const response = await fetch(`${API_URL}/api/users/signup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: fullName, email: email, password: password })
+        });
 
-      if (!response.ok) throw new Error("Invalid Credentials");
-
-      // Check if response is JSON or Text
-      const contentType = response.headers.get("content-type");
-      let token;
-      
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        const data = await response.json();
-        token = data.token; // Assuming your Java backend returns { "token": "..." }
-      } else {
-        token = await response.text();
+        if (response.ok) {
+          alert("Account created successfully!");
+          setIsSignup(false);
+        } else {
+          alert("Signup failed: User may already exist");
+        }
+      } catch (error) {
+        console.error("Signup Error:", error);
+        alert("Cannot connect to server. It might still be waking up.");
+      } finally {
+        setLoading(false);
       }
+    } else {
+      try {
+        const response = await fetch(`${API_URL}/api/users/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email, password: password })
+        });
 
-      const extractedName = email.split('@')[0];
+        if (!response.ok) throw new Error("Invalid Credentials");
 
-      localStorage.setItem("token", token);
-      localStorage.setItem("username", extractedName); 
+        const contentType = response.headers.get("content-type");
+        let token;
+        
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const data = await response.json();
+          token = data.token;
+        } else {
+          token = await response.text();
+        }
 
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Login Error:", error);
-      alert("Invalid email or password");
+        const extractedName = email.split('@')[0];
+        localStorage.setItem("token", token);
+        localStorage.setItem("username", extractedName); 
+
+        navigate("/dashboard");
+      } catch (error) {
+        console.error("Login Error:", error);
+        alert("Invalid email or password. Note: If this is the first try, the server may take 30s to wake up.");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
-};
+  };
 
   /* ---------------- 3D CARD EFFECT ---------------- */
   const handleMouseMove = (e) => {
@@ -94,11 +104,24 @@ const handleAuth = async () => {
   return (
     <div className="relative min-h-screen bg-black text-white overflow-x-hidden">
       
+      {/* ---------------- NAVBAR ---------------- */}
+      <nav className="fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-black/40 border-b border-white/10 px-10 py-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-purple-400 bg-clip-text text-transparent">
+          SmartExpense
+        </h1>
+        <button 
+          onClick={() => setShowLoginModal(true)}
+          className="px-6 py-2 rounded-full border border-yellow-400/50 text-yellow-400 hover:bg-yellow-400 hover:text-black transition-all"
+        >
+          Login / Sign Up
+        </button>
+      </nav>
+
       {/* ---------------- BACKGROUND ---------------- */}
       <motion.div
         animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
         transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-        className="fixed inset-0 -z-10 bg-[linear-gradient(120deg,#0a0a0a,#1a1a1a,#2a2a2a,#4b2a63,#1a1a1a,#0a0a0a)] bg-[length:400%_400%] opacity-70"
+        className="fixed inset-0 -z-10 bg-[linear-gradient(120deg,#0a0a0a,#1a1a1a,#2a2a2a,#4b2a63,#1a1a1a,#0a0a0a)] bg-[length:400%_400%] opacity:70"
       />
 
       <motion.div
@@ -113,42 +136,56 @@ const handleAuth = async () => {
         className="fixed w-[600px] h-[600px] bg-purple-500/10 blur-[130px] rounded-full bottom-20 right-10"
       />
 
-      {/* ---------------- LOGIN PANEL ---------------- */}
-      <section ref={loginRef} className="min-h-screen flex items-center justify-center px-6">
-        <motion.div
-          key={isSignup}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="backdrop-blur-2xl bg-white/10 border border-white/20 p-10 rounded-3xl shadow-[0_0_60px_rgba(212,175,55,0.25)] w-96"
-        >
-          <h2 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-yellow-400 via-gray-200 to-purple-400 bg-clip-text text-transparent">
-            {isSignup ? "Create Account" : "Welcome Back"}
-          </h2>
-          <p className="text-gray-400 text-sm text-center mb-6">
-            {isSignup ? "Experience luxury expense management" : "Sign in to continue"}
-          </p>
+      {/* ---------------- LOGIN POP-UP (MODAL) ---------------- */}
+      {showLoginModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-6">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative"
+          >
+            {/* CLOSE BUTTON */}
+            <button 
+              onClick={() => setShowLoginModal(false)}
+              className="absolute -top-12 right-0 text-white text-3xl hover:text-yellow-400 transition"
+            >
+              ✕
+            </button>
 
-          <div className="space-y-4">
-            {isSignup && (
-              <input type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
-            )}
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
-            {isSignup && (
-              <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
-            )}
-          </div>
+            <div className="backdrop-blur-2xl bg-white/10 border border-white/20 p-10 rounded-3xl shadow-[0_0_60px_rgba(212,175,55,0.25)] w-96">
+              <h2 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-yellow-400 via-gray-200 to-purple-400 bg-clip-text text-transparent">
+                {isSignup ? "Create Account" : "Welcome Back"}
+              </h2>
+              <p className="text-gray-400 text-sm text-center mb-6">
+                {isSignup ? "Experience luxury expense management" : "Sign in to continue"}
+              </p>
 
-          <button onClick={handleAuth} className="w-full mt-6 p-3 rounded-xl bg-gradient-to-r from-yellow-400 via-gray-300 to-gray-400 text-black font-semibold hover:scale-105 transition">
-            {isSignup ? "Sign Up" : "Login"}
-          </button>
+              <div className="space-y-4">
+                {isSignup && (
+                  <input type="text" placeholder="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
+                )}
+                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
+                <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
+                {isSignup && (
+                  <input type="password" placeholder="Confirm Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-3 rounded-xl bg-black/40 border border-white/10 text-white outline-none focus:border-yellow-400/50 transition" />
+                )}
+              </div>
 
-          <p onClick={() => setIsSignup(!isSignup)} className="mt-4 text-gray-400 text-sm text-center cursor-pointer hover:text-yellow-400 transition">
-            {isSignup ? "Already have account? Login" : "Don't have account? Sign Up"}
-          </p>
-        </motion.div>
-      </section>
+              <button 
+                onClick={handleAuth} 
+                disabled={loading}
+                className={`w-full mt-6 p-3 rounded-xl bg-gradient-to-r from-yellow-400 via-gray-300 to-gray-400 text-black font-semibold hover:scale-105 transition ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {loading ? "Waking up server..." : (isSignup ? "Sign Up" : "Login")}
+              </button>
+
+              <p onClick={() => setIsSignup(!isSignup)} className="mt-4 text-gray-400 text-sm text-center cursor-pointer hover:text-yellow-400 transition">
+                {isSignup ? "Already have account? Login" : "Don't have account? Sign Up"}
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* ---------------- FEATURES ---------------- */}
       <motion.section 
@@ -156,7 +193,7 @@ const handleAuth = async () => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8 }}
-        className="min-h-screen flex flex-col items-center justify-center px-10 py-20"
+        className="min-h-screen flex flex-col items-center justify-center px-10 py-20 mt-10"
       >
         <h2 className="text-5xl font-bold mb-16 text-center bg-gradient-to-r from-gray-200 via-yellow-400 to-purple-300 bg-clip-text text-transparent">
           Powerful Expense Tracking
@@ -247,10 +284,10 @@ const handleAuth = async () => {
         <p className="text-gray-400 max-w-xl mb-10 text-lg">Smart Expense Tracker helps you build better financial habits.</p>
         <motion.button
           whileHover={{ scale: 1.1 }}
-          onClick={() => loginRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+          onClick={() => setShowLoginModal(true)} // Changed to trigger pop-up
           className="px-10 py-4 rounded-2xl bg-gradient-to-r from-yellow-400 to-purple-400 text-black font-semibold shadow-[0_0_40px_rgba(255,215,0,0.35)]"
         >
-          Back To Login
+          Get Started Now
         </motion.button>
       </section>
     </div>
