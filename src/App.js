@@ -10,11 +10,12 @@ function App() {
  useEffect(() => {
     const wakeUp = async () => {
       try {
-        // This pings your specific Render link
-        await axios.get("https://smart-expense-4g4x.onrender.com/api/users"); 
+        const API = "https://smart-expense-4g4x.onrender.com"; // Hardcode for a test if env fails
+        await axios.get(`${API}/api/users`, {
+          headers: { 'Content-Type': 'application/json' }
+        });
       } catch (err) {
-        // We don't care about the error, we just want the server to wake up!
-        console.log("Please wait...");
+        console.log("Please Wait...");
       }
     };
     wakeUp();
